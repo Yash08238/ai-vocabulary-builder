@@ -1,0 +1,8 @@
+# Optional packages for Gemini model support
+# Try to install these if you need Gemini/Generative AI features.
+# Note: these may not be available on all platforms or Python versions.
+
+google-generative-ai>=0.3.0  # optional — install manually if available
+
+# Example local install:
+# pip install -r OPTIONAL_REQUIREMENTS.txt

@@ -1,5 +1,6 @@
 streamlit>=1.25.0
-google-generative-ai>=0.3.0
 python-dotenv>=0.21.0
-# Optional: python-dotenv for local .env support
+# NOTE: `google-generative-ai` was removed from this file because some platforms
+# (including Streamlit Cloud at the time of deploy) cannot find it in the package
+# registry. If you need Gemini model support, see `OPTIONAL_REQUIREMENTS.txt`.
 # Add any other dependencies if you install them

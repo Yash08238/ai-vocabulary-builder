@@ -51,9 +51,23 @@ Try the following:
    - python -m venv venv
    - venv\Scripts\activate  (Windows)
    - pip install -r requirements.txt
-   - pip install google-generative-ai
+   - pip install google-generative-ai  # optional; may fail if package is not available
    - streamlit run app.py
 
 4. If installation fails on the platform, check the deploy logs for details and consider using a supported Python version (see step 2).
+
+Workaround if the package is not available on the platform
+
+If you see an error like:
+
+```
+No matching distribution found for google-generative-ai>=0.3.0
+```
+
+Then the host's package resolver cannot find the package. A safe workaround to get the app running (without Gemini model features) is:
+
+1. Remove `google-generative-ai` from `requirements.txt` (it has been removed in this repo to allow deployment).
+2. Push and redeploy — the app will start and will show a clear message indicating the model/SDK is not available.
+3. If/when `google-generative-ai` becomes available, you can add it back to `requirements.txt` or install it manually in the environment and redeploy.
 
 If you're still stuck, share the log output and I can help debug further.
