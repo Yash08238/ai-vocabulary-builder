@@ -1,0 +1,5 @@
+streamlit>=1.25.0
+google-generative-ai>=0.3.0
+python-dotenv>=0.21.0
+# Optional: python-dotenv for local .env support
+# Add any other dependencies if you install them

@@ -29,3 +29,22 @@ The app generates personalized vocabulary lists based on user level and interest
 4. Create personalized exercises based on saved vocabulary  
 
 Created by **Yash Chauhan**.
+
+---
+
+## 🚀 Deploy to Streamlit
+
+To run locally:
+
+1. Install dependencies: `pip install -r requirements.txt`
+2. Set your Gemini API key in an environment variable called `GEMINI_API_KEY` or use `secrets.example.toml` as a reference
+3. Run: `streamlit run app.py`
+
+To deploy on Streamlit Cloud:
+
+1. Push this repository to GitHub
+2. Create a new app on Streamlit Cloud and point it to this repo
+3. In the app's Settings → Secrets, add `GEMINI_API_KEY` (do NOT commit your real key)
+4. Streamlit will detect `app.py` and `requirements.txt` and deploy the app
+
+See `DEPLOYMENT.md` for more details and troubleshooting.
