@@ -5,7 +5,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
-import google.generativeai as genai
+
+# Try to import the Google Generative AI SDK; handle gracefully if it's missing
+try:
+    import google.generativeai as genai
+    HAS_GENAI = True
+except ModuleNotFoundError:
+    genai = None
+    HAS_GENAI = False
 
 # ------------------ CONFIG ------------------
 st.set_page_config(
@@ -27,12 +34,21 @@ except Exception:
 if not GEMINI_API_KEY:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# Validate setup and initialize the model only if SDK is available
 if not GEMINI_API_KEY or GEMINI_API_KEY.strip() == "" or GEMINI_API_KEY == "YOUR_API_KEY_HERE":
     st.error("❌ Gemini API key is missing. On Streamlit Cloud, add 'GEMINI_API_KEY' under Settings → Secrets. Locally, set environment variable 'GEMINI_API_KEY'.")
+    model = None
 else:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+    if not HAS_GENAI:
+        st.error("❌ The 'google-generative-ai' package is not installed. Add it to `requirements.txt` or install it locally (`pip install google-generative-ai`). See DEPLOYMENT.md troubleshooting.")
+        model = None
+    else:
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+        except Exception as e:
+            st.error(f"Error initializing Gemini model: {e}")
+            model = None
 
 # ------------------ SIDEBAR ------------------
 with st.sidebar:
@@ -100,6 +116,10 @@ def get_level_instruction(level: str) -> str:
     return rules.get(level, "")
 
 def generate_words(level, interest, num_words, tone, temperature, previous_words_text):
+    if model is None:
+        st.error("Gemini model is not available. Ensure `google-generative-ai` is installed and `GEMINI_API_KEY` is set. See DEPLOYMENT.md troubleshooting.")
+        return ""
+
     level_instruction = get_level_instruction(level)
     prompt = f"""
 You are an English vocabulary coach.
@@ -142,6 +162,11 @@ def generate_exercise(saved_sets, temperature):
     if not saved_sets:
         st.warning("Save at least one vocabulary set first.")
         return ""
+
+    if model is None:
+        st.error("Gemini model is not available. Ensure `google-generative-ai` is installed and `GEMINI_API_KEY` is set. See DEPLOYMENT.md troubleshooting.")
+        return ""
+
     words_block = "\n\n".join(saved_sets)
     prompt = f"""
 You are an English teacher creating a practice worksheet.

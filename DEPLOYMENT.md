@@ -30,3 +30,30 @@ Notes
 
 - Do NOT commit real API keys to the repository. Use Streamlit's Secrets UI for production or CI secure storage.
 - If you prefer local .env files, consider using python-dotenv and loading it in `app.py` for local convenience.
+
+---
+
+## Troubleshooting
+
+If your Streamlit deployment fails with an error like:
+
+```
+ModuleNotFoundError: No module named 'google.generativeai'
+```
+
+Try the following:
+
+1. Ensure `google-generative-ai` is listed in `requirements.txt`. If not, add it and push the change.
+
+2. Make sure your Python runtime is compatible with the SDK. Some cloud hosts use a newer Python version by default; pin the runtime to a compatible version (e.g., `python-3.10`) in `runtime.txt`, then redeploy.
+
+3. Manually test locally:
+   - python -m venv venv
+   - venv\Scripts\activate  (Windows)
+   - pip install -r requirements.txt
+   - pip install google-generative-ai
+   - streamlit run app.py
+
+4. If installation fails on the platform, check the deploy logs for details and consider using a supported Python version (see step 2).
+
+If you're still stuck, share the log output and I can help debug further.
