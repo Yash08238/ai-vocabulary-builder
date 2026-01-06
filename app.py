@@ -14,12 +14,71 @@ except ModuleNotFoundError:
     genai = None
     HAS_GENAI = False
 
+import requests
+import json
+
+
 # ------------------ CONFIG ------------------
 st.set_page_config(
     page_title="Personal Vocabulary Builder",
     page_icon="🗣️",
     layout="wide",
 )
+
+# ------------------ CUSTOM CSS ------------------
+st.markdown("""
+<style>
+    /* Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Gradient Title */
+    h1 {
+        background: -webkit-linear-gradient(45deg, #6C63FF, #FF6584);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+    }
+    
+    /* Modern Cards (Expander & Containers) */
+    .stExpander {
+        background-color: #1E2128; /* Slightly lighter than bg */
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border: 1px solid #30333D;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(90deg, #6C63FF 0%, #5A52D5 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(108, 99, 255, 0.4);
+    }
+    
+    /* Inputs */
+    .stTextInput > div > div > input, .stSelectbox > div > div > div {
+        background-color: #1E2128;
+        color: white;
+        border-radius: 8px;
+        border: 1px solid #30333D;
+    }
+    
+    /* Sidebar styling preference */
+    section[data-testid="stSidebar"] {
+        background-color: #1a1c24;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # 🔐 Gemini API key — loaded from Streamlit secrets or environment variable
 GEMINI_API_KEY = None
@@ -38,17 +97,39 @@ if not GEMINI_API_KEY:
 if not GEMINI_API_KEY or GEMINI_API_KEY.strip() == "" or GEMINI_API_KEY == "YOUR_API_KEY_HERE":
     st.error("❌ Gemini API key is missing. On Streamlit Cloud, add 'GEMINI_API_KEY' under Settings → Secrets. Locally, set environment variable 'GEMINI_API_KEY'.")
     model = None
-else:
-    if not HAS_GENAI:
-        st.error("❌ The 'google-generative-ai' package is not installed. Add it to `requirements.txt` or install it locally (`pip install google-generative-ai`). See DEPLOYMENT.md troubleshooting.")
+elif HAS_GENAI:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+    except Exception as e:
+        st.error(f"Error initializing Gemini model: {e}")
         model = None
-    else:
-        try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-2.5-flash")
-        except Exception as e:
-            st.error(f"Error initializing Gemini model: {e}")
-            model = None
+else:
+    model = None
+
+
+# REST Fallback Helper works even if model is None (due to missing SDK)
+def call_gemini_rest(prompt, temperature=0.7):
+    if not GEMINI_API_KEY:
+        return None
+    
+    # Fallback model
+    model_name = "gemini-2.5-flash" 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": temperature}
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        return result['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        return f"Error via REST API: {e}"
+
 
 # ------------------ SIDEBAR ------------------
 with st.sidebar:
@@ -116,9 +197,10 @@ def get_level_instruction(level: str) -> str:
     return rules.get(level, "")
 
 def generate_words(level, interest, num_words, tone, temperature, previous_words_text):
-    if model is None:
+    if model is None and not HAS_GENAI and not GEMINI_API_KEY:
         st.error("Gemini model is not available. Ensure `google-generative-ai` is installed and `GEMINI_API_KEY` is set. See DEPLOYMENT.md troubleshooting.")
         return ""
+
 
     level_instruction = get_level_instruction(level)
     prompt = f"""
@@ -148,22 +230,27 @@ For each word, use this format:
 
 Do not add any intro or conclusion. Only output the list of words.
 """
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config={"temperature": temperature},
-        )
-        return response.text.strip()
-    except Exception as e:
-        st.error(f"Error while generating words: {e}")
-        return ""
+    if model:
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config={"temperature": temperature},
+            )
+            return response.text.strip()
+        except Exception as e:
+            st.error(f"Error while generating words: {e}")
+            return ""
+    else:
+        # Fallback to REST API
+        return call_gemini_rest(prompt, temperature)
+
 
 def generate_exercise(saved_sets, temperature):
     if not saved_sets:
         st.warning("Save at least one vocabulary set first.")
         return ""
 
-    if model is None:
+    if model is None and not HAS_GENAI and not GEMINI_API_KEY:
         st.error("Gemini model is not available. Ensure `google-generative-ai` is installed and `GEMINI_API_KEY` is set. See DEPLOYMENT.md troubleshooting.")
         return ""
 
@@ -184,15 +271,20 @@ Using ONLY these words, create:
 Format everything cleanly in Markdown.
 Do NOT give the answers.
 """
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config={"temperature": temperature},
-        )
-        return response.text.strip()
-    except Exception as e:
-        st.error(f"Error while generating exercise: {e}")
-        return ""
+    if model:
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config={"temperature": temperature},
+            )
+            return response.text.strip()
+        except Exception as e:
+            st.error(f"Error while generating exercise: {e}")
+            return ""
+    else:
+        # Fallback to REST API
+        return call_gemini_rest(prompt, temperature)
+
 
 # ------------------ MAIN LAYOUT ------------------
 col1, col2 = st.columns([2, 1])
